@@ -5,7 +5,9 @@
   "main": "server.js",
   "scripts": {
     "start": "nodemon --ignore 'dev-data/' .",
-    "start:prod": "NODE_ENV=production nodemon --ignore 'dev-data/' ."
+    "start:prod": "NODE_ENV=production nodemon --ignore 'dev-data/' .",
+    "delete": "node dev-data/data/import-dev-data.js --delete",
+    "import": "node dev-data/data/import-dev-data.js --import"
   },
   "author": "",
   "license": "ISC",
