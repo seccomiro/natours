@@ -1,4 +1,5 @@
 const Tour = require('./../models/tourModel');
+const APIFeatures = require('./../utils/apiFeatures');
 
 const invalidResponse = (res, err, code = 404) =>
   res.status(code).json({
@@ -12,6 +13,13 @@ const okResponse = (res, data = null, code = 200) =>
     data
   });
 
+const resultResponse = (res, data = null, code = 200) =>
+  res.status(code).json({
+    status: 'success',
+    results: data.length,
+    data
+  });
+
 exports.aliasTopTours = (req, res, next) => {
   req.query.fields = 'name,price,ratingsAverage,summary,difficulty';
   req.query.sort = 'price,ratingsAverage';
@@ -21,29 +29,33 @@ exports.aliasTopTours = (req, res, next) => {
 
 exports.getAllTours = async (req, res) => {
   try {
-    let queryObject = { ...req.query };
-    const excludedFields = ['page', 'sort', 'limit', 'fields'];
-    excludedFields.forEach(el => delete queryObject[el]);
+    // // Filter
+    // let queryObject = { ...req.query };
+    // const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    // excludedFields.forEach(el => delete queryObject[el]);
 
-    const queryString = JSON.stringify(queryObject).replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
-    queryObject = JSON.parse(queryString);
+    // const queryString = JSON.stringify(queryObject).replace(/\b(gte|gt|lte|lt)\b/g, match => `$${match}`);
+    // queryObject = JSON.parse(queryString);
 
-    let query = Tour.find(queryObject);
+    // let query = Tour.find(queryObject);
 
-    let sortBy = '-createdAt';
-    if (req.query.sort) {
-      const sortByFields = req.query.sort.split(',').join(' ');
-      sortBy = `${sortByFields} ${sortBy}`;
-    }
-    query = query.sort(sortBy);
+    // // Sort
+    // let sortBy = '-createdAt';
+    // if (req.query.sort) {
+    //   const sortByFields = req.query.sort.split(',').join(' ');
+    //   sortBy = `${sortByFields} ${sortBy}`;
+    // }
+    // query = query.sort(sortBy);
 
-    const fields = req.query.fields ? req.query.fields.split(',').join(' ') : '-__v';
-    query = query.select(fields);
+    // // Fields
+    // const fields = req.query.fields ? req.query.fields.split(',').join(' ') : '-__v';
+    // query = query.select(fields);
 
-    const limit = parseInt(req.query.limit || 5, 10);
-    const page = parseInt(req.query.page || 1, 10);
-    const skip = (page - 1) * limit;
-    query = query.skip(skip).limit(limit);
+    // // Pagination
+    // const limit = parseInt(req.query.limit || 5, 10);
+    // const page = parseInt(req.query.page || 1, 10);
+    // const skip = (page - 1) * limit;
+    // query = query.skip(skip).limit(limit);
 
     // const query = Tour.find()
     //   .where('duration')
@@ -51,18 +63,19 @@ exports.getAllTours = async (req, res) => {
     //   .where('difficulty')
     //   .equals(req.query.difficulty);
 
-    if (req.query.page) {
-      const numTours = await Tour.countDocuments();
-      if (skip > numTours) throw new Error(`The page number ${page} does not exist`);
-    }
+    // if (req.query.page) {
+    //   const numTours = await Tour.countDocuments();
+    //   if (skip > numTours) throw new Error(`The page number ${page} does not exist`);
+    // }
 
-    const tours = await query;
+    const features = new APIFeatures(Tour.find(), req.query)
+      .filter()
+      .sort()
+      .fields()
+      .paginate();
+    const tours = await features.query;
 
-    res.status(200).json({
-      status: 'success',
-      results: tours.length,
-      data: { tours }
-    });
+    resultResponse(res, tours);
   } catch (error) {
     invalidResponse(res, error.message);
   }
@@ -82,7 +95,7 @@ exports.createTour = async (req, res) => {
     const newTour = await Tour.create(req.body);
     okResponse(res, { tour: newTour }, 201);
   } catch (err) {
-    invalidResponse(res, 'Invalid data set', 400);
+    invalidResponse(res, err, 400);
   }
 };
 
@@ -94,7 +107,7 @@ exports.updateTour = async (req, res) => {
     });
     okResponse(res, { tour });
   } catch (error) {
-    invalidResponse(res, 'Invalid data set', 400);
+    invalidResponse(res, error, 400);
   }
 };
 
@@ -116,4 +129,80 @@ exports.deleteTour = async (req, res) => {
   //     data: null
   //   });
   // });
+};
+
+exports.getTourStats = async (req, res) => {
+  try {
+    const stats = await Tour.aggregate([
+      {
+        $match: { ratingsAverage: { $gte: 4.5 } }
+      },
+      {
+        $group: {
+          // _id: 'null',
+          _id: { $toUpper: '$difficulty' },
+          // _id: '$ratingsAverage',
+          numRatings: { $sum: '$ratingsQuantity' },
+          numTours: { $sum: 1 },
+          avgRating: { $avg: '$ratingsAverage' },
+          avgPrice: { $avg: '$price' },
+          minPrice: { $min: '$price' },
+          maxPrice: { $max: '$price' }
+        }
+      },
+      {
+        $sort: { avgPrice: 1 }
+      },
+      {
+        $match: { _id: { $ne: 'EASY' } }
+      }
+    ]);
+    resultResponse(res, stats);
+  } catch (error) {
+    invalidResponse(res, error.message, 400);
+  }
+};
+
+exports.getMonthlyPlan = async (req, res) => {
+  try {
+    const year = req.params.year * 1;
+    const plan = await Tour.aggregate([
+      {
+        $unwind: '$startDates'
+      },
+      {
+        $match: {
+          startDates: {
+            $gte: new Date(`${year}-01-01`),
+            $lte: new Date(`${year}-12-31`)
+          }
+        }
+      },
+      {
+        $group: {
+          _id: { $month: '$startDates' },
+          count: { $sum: 1 },
+          tours: { $push: '$name' }
+        }
+      },
+      {
+        $addFields: { month: '$_id' }
+      },
+      {
+        $project: {
+          _id: 0
+        }
+      },
+      {
+        $sort: { count: -1 }
+      },
+      {
+        $limit: 12
+      }
+    ]);
+
+    resultResponse(res, plan);
+  } catch (error) {
+    invalidResponse(res, error.message, 400);
+  }
 };
