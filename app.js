@@ -20,8 +20,11 @@ app.use((req, res, next) => {
   next();
 });
 
-app.get((req, res) => {
-  res.status(200).render('base');
+app.get('/', (req, res) => {
+  res.status(200).render('base', {
+    tour: 'The Forest Hiker',
+    user: 'Diego'
+  });
 });
 
 const defaultRoute = '/api/v1';
