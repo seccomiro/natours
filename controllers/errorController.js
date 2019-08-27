@@ -46,10 +46,20 @@ module.exports = (err, req, res, next) => {
   if (process.env.NODE_ENV === 'development') {
     sendErrorDev(res, err);
   } else if (process.env.NODE_ENV === 'production') {
-    let error = { ...err };
-    if (error.name === 'CastError') error = handleCastErrorDB(error);
-    if (error.name === 'ValidationError') error = handleValidationErrorDB(error);
-    if (error.code === 11000) error = handleDuplicateFields(error);
+    // let error = { ...err };
+    let error;
+
+    if (err.name === 'CastError' || err.constructor.name === 'CastError') {
+      error = handleCastErrorDB(err);
+    } else if (err.name === 'ValidationError' || err.constructor.name === 'ValidationError') {
+      error = handleValidationErrorDB(err);
+    } else if (err.code === 11000) {
+      error = handleDuplicateFields(err);
+    } else {
+      error = err;
+    }
+
+    // console.log('-----------------', err.name, err.constructor.name, err.message);
 
     sendErrorProd(res, error);
   }
