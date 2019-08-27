@@ -8,7 +8,7 @@ const userSchema = new mongoose.Schema(
       type: String,
       required: [true, 'A user must have a name'],
       maxlength: [40, 'A user name must have a maximum of 40 characters'],
-      minlength: [10, 'A user name must have a minimum of 10 characters']
+      minlength: [8, 'A user name must have a minimum of 8 characters']
     },
     email: {
       type: String,
@@ -37,7 +37,12 @@ const userSchema = new mongoose.Schema(
       }
     },
     createdAt: { type: Date, default: Date.now(), select: false },
-    passwordChangedAt: Date
+    passwordChangedAt: Date,
+    role: {
+      type: String,
+      enum: ['user', 'guide', 'lead-guide', 'admin'],
+      default: 'user'
+    }
   },
   {
     toJSON: { virtuals: true },

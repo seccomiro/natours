@@ -13,7 +13,7 @@ mongoose
     useCreateIndex: true,
     useFindAndModify: false
   })
-  .then(() => {
+  .then(async () => {
     console.log('DB connected successfully.');
 
     const importData = async (model, simple = false) => {
@@ -33,7 +33,6 @@ mongoose
       } catch (error) {
         console.log(error);
       }
-      process.exit();
     };
 
     const deleteData = async model => {
@@ -44,18 +43,17 @@ mongoose
       } catch (error) {
         console.log(error);
       }
-      process.exit();
     };
 
     const option = process.argv[2];
     if (option === '--import') {
-      importData(Tour, false);
-      importData(User);
+      await importData(Tour, false);
+      await importData(User);
     } else if (option === '--delete') {
-      deleteData(Tour);
-      deleteData(User);
+      await deleteData(User);
+      await deleteData(Tour);
     } else {
       console.error('Invalid option.');
-      process.exit();
     }
+    process.exit();
   });
