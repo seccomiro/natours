@@ -10,7 +10,6 @@ const handleDuplicateFields = err => {
   // const field = err.path === '_id' ? 'id' : err.path;
   const value = err.errmsg.match(/(["'])(\\?.)*?\1/)[0].replace(/"/g, "'");
   const message = `The value ${value} has already been used.`;
-  console.log(message);
   return new AppError(message, 400);
 };
 
@@ -66,8 +65,6 @@ module.exports = (err, req, res, next) => {
     } else {
       error = err;
     }
-
-    // console.log('-----------------', err.name, err.constructor.name, err.message);
 
     sendErrorProd(res, error);
   }
