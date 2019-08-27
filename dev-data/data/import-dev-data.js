@@ -2,6 +2,7 @@ const fs = require('fs');
 const dotenv = require('dotenv');
 const mongoose = require('mongoose');
 const Tour = require('./../../models/tourModel');
+const User = require('./../../models/userModel');
 
 dotenv.config({ path: './config.env' });
 
@@ -15,11 +16,19 @@ mongoose
   .then(() => {
     console.log('DB connected successfully.');
 
-    const importData = async () => {
-      console.log('Importing all data...');
-      const tours = JSON.parse(fs.readFileSync(`${__dirname}/tours-simple.json`, 'utf-8'));
+    const importData = async (model, simple = false) => {
+      const type = simple ? '-simple' : '';
+      const collection = `${model.modelName.toLowerCase()}s`;
+      console.log(`Importing all ${collection}...`);
+      const documents = JSON.parse(fs.readFileSync(`${__dirname}/${collection}${type}.json`, 'utf-8'));
+      if (model === User) {
+        documents.forEach(u => {
+          u.passwordConfirm = u.password;
+        });
+      }
+
       try {
-        await Tour.create(tours);
+        await model.create(documents);
         console.log('Data successfully loaded.');
       } catch (error) {
         console.log(error);
@@ -27,10 +36,10 @@ mongoose
       process.exit();
     };
 
-    const deleteData = async () => {
+    const deleteData = async model => {
       try {
-        console.log('Deleting all data...');
-        await Tour.deleteMany();
+        console.log(`Deleting all ${model.modelName.toLowerCase()}s...`);
+        await model.deleteMany();
         console.log('Data successfully deleted.');
       } catch (error) {
         console.log(error);
@@ -39,9 +48,13 @@ mongoose
     };
 
     const option = process.argv[2];
-    if (option === '--import') importData();
-    else if (option === '--delete') deleteData();
-    else {
+    if (option === '--import') {
+      importData(Tour, false);
+      importData(User);
+    } else if (option === '--delete') {
+      deleteData(Tour);
+      deleteData(User);
+    } else {
       console.error('Invalid option.');
       process.exit();
     }
