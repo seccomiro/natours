@@ -12,6 +12,17 @@ const signToken = id => {
   });
 };
 
+const createSendToken = (user, statusCode, res, sendUser = false) => {
+  const token = signToken(user._id);
+  res.status(statusCode).json({
+    status: 'success',
+    token,
+    data: {
+      user: sendUser ? user : undefined
+    }
+  });
+};
+
 exports.signup = catchAsync(async (req, res, next) => {
   let newUser = await User.create({
     name: req.body.name,
@@ -22,13 +33,7 @@ exports.signup = catchAsync(async (req, res, next) => {
 
   newUser = await User.findById(newUser._id);
 
-  const token = signToken(newUser._id);
-
-  res.status(201).json({
-    status: 'success',
-    token,
-    data: { user: newUser }
-  });
+  createSendToken(newUser, 201, res, true);
 });
 
 exports.login = catchAsync(async (req, res, next) => {
@@ -42,12 +47,7 @@ exports.login = catchAsync(async (req, res, next) => {
     return next(new AppError('Incorrect email or password!', 401));
   }
 
-  const token = signToken(user._id);
-
-  res.status(200).json({
-    status: 'success',
-    token
-  });
+  createSendToken(user, 200, res);
 });
 
 exports.protect = catchAsync(async (req, res, next) => {
@@ -125,12 +125,21 @@ exports.resetPassword = catchAsync(async (req, res, next) => {
   user.password = req.body.password;
   user.passwordConfirm = req.body.passwordConfirm;
   user.passwordResetToken = undefined;
-  user.createPasswordResetExpires = undefined;
+  user.passwordResetExpires = undefined;
   await user.save();
 
-  const token = signToken(user._id);
-  res.status(200).json({
-    status: 'success',
-    token
-  });
+  createSendToken(user, 200, res);
+});
+
+exports.updatePassword = catchAsync(async (req, res, next) => {
+  const user = await User.findById(req.user.id).select('+password');
+  const correct = await user.correctPassword(req.body.currentPassword, user.password);
+  if (!correct) {
+    return next(new AppError('The password that you provided is invalid. Try again!', 401));
+  }
+  user.password = req.body.newPassword;
+  user.passwordConfirm = req.body.newPasswordConfirm;
+  await user.save();
+
+  createSendToken(user, 200, res);
 });
